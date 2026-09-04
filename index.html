@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <title>GR Gestão</title>
+<!-- GR Gestão FINAL OTP v3 - 2026-09-04 -->
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}
@@ -271,6 +272,10 @@ img{display:block}
 
 
 /* ===== AUTENTICAÇÃO GR GESTÃO ===== */
+.auth-shell[hidden], #mainApp[hidden], [hidden]{display:none !important}
+body.gr-authenticated #authShell{display:none !important}
+body.gr-authenticated #mainApp{display:block !important}
+body:not(.gr-authenticated) #mainApp{display:none !important}
 .auth-shell{
   min-height:100vh;display:flex;align-items:center;justify-content:center;
   padding:28px 16px;background:radial-gradient(circle at top right,rgba(37,99,235,.10),transparent 35%),var(--bg)
@@ -326,25 +331,33 @@ img{display:block}
     </div>
 
     <div id="authRegister" class="auth-view" hidden>
-      <div class="auth-head"><h1>Criar conta</h1><p>Cadastre seus dados. A conta será liberada após a confirmação do e-mail.</p></div>
-      <div class="form-group"><label>👤 Nome completo</label><input id="registerName" type="text" autocomplete="name" placeholder="Seu nome completo"></div>
+      <div class="auth-head"><h1>Criar conta</h1><p>Primeiro confirme que o e-mail realmente pertence a você.</p></div>
       <div class="form-group"><label>📧 E-mail</label><input id="registerEmail" type="email" autocomplete="email" placeholder="seuemail@email.com"></div>
-      <div class="form-group"><label>📱 Telefone</label><input id="registerPhone" type="tel" autocomplete="tel" placeholder="(64) 99999-9999"></div>
-      <div class="form-group"><label>🔐 Criar senha</label><input id="registerPassword" type="password" autocomplete="new-password" placeholder="Mínimo de 8 caracteres"></div>
-      <div class="form-group"><label>🔐 Confirmar senha</label><input id="registerPasswordConfirm" type="password" autocomplete="new-password" placeholder="Digite novamente"></div>
-      <button class="primary" id="registerBtn">CRIAR CONTA</button>
+      <button class="primary" id="sendRegisterCodeBtn">ENVIAR CÓDIGO</button>
       <div id="registerError" class="auth-error"></div>
       <div class="auth-divider">já possui conta?</div>
       <button class="secondary" id="backToLoginBtn">ENTRAR</button>
     </div>
 
-    <div id="authEmailPending" class="auth-view" hidden>
-      <div class="auth-head"><h1>Confirme seu e-mail</h1><p>Enviamos uma confirmação para o endereço cadastrado.</p></div>
-      <div class="auth-status"><span>📧</span><div><b>E-mail aguardando confirmação</b><small id="pendingEmailText"></small></div></div>
-      <button class="primary" id="resendEmailBtn">REENVIAR E-MAIL</button>
-      <button class="secondary" id="emailConfirmedBtn">JÁ CONFIRMEI — ENTRAR</button>
-      <div id="emailPendingMsg" class="auth-success"></div>
-      <button class="auth-link" id="emailPendingBackBtn">← Voltar</button>
+    <div id="authRegisterOtp" class="auth-view" hidden>
+      <div class="auth-head"><h1>Confira seu e-mail</h1><p>Digite abaixo o código enviado para o endereço informado.</p></div>
+      <div class="auth-status"><span>📧</span><div><b>Código enviado para</b><small id="pendingEmailText"></small></div></div>
+      <div class="form-group"><label>🔢 Código de verificação</label><input id="registerEmailOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="000000"></div>
+      <button class="primary" id="verifyRegisterCodeBtn">CONFIRMAR CÓDIGO</button>
+      <button class="secondary" id="resendRegisterCodeBtn">REENVIAR CÓDIGO</button>
+      <div id="registerOtpError" class="auth-error"></div><div id="registerOtpSuccess" class="auth-success"></div>
+      <button class="auth-link" id="changeRegisterEmailBtn">← Alterar e-mail</button>
+    </div>
+
+    <div id="authRegisterDetails" class="auth-view" hidden>
+      <div class="auth-head"><h1>Complete sua conta</h1><p>E-mail confirmado. Agora crie sua senha e finalize o cadastro.</p></div>
+      <div class="auth-status"><span>✅</span><div><b>E-mail verificado</b><small id="verifiedRegisterEmail"></small></div></div>
+      <div class="form-group"><label>👤 Nome completo</label><input id="registerName" type="text" autocomplete="name" placeholder="Seu nome completo"></div>
+      <div class="form-group"><label>📱 Telefone</label><input id="registerPhone" type="tel" autocomplete="tel" placeholder="(64) 99999-9999"></div>
+      <div class="form-group"><label>🔐 Criar senha</label><input id="registerPassword" type="password" autocomplete="new-password" placeholder="Mínimo de 8 caracteres"></div>
+      <div class="form-group"><label>🔐 Confirmar senha</label><input id="registerPasswordConfirm" type="password" autocomplete="new-password" placeholder="Digite novamente"></div>
+      <button class="primary" id="finalizeRegisterBtn">CRIAR CONTA</button>
+      <div id="registerDetailsError" class="auth-error"></div>
     </div>
 
     <div id="authPhoneVerify" class="auth-view" hidden>
@@ -1008,6 +1021,8 @@ let syncTimer = null;
 let appEventSetupDone = false;
 let pendingRegistrationEmail = localStorage.getItem("gr_pending_email") || "";
 let pendingRegistrationPhone = ""; // SMS desativado
+let registrationMode = false;
+let registrationVerified = false;
 
 // Recuperação de senha: captura o estado ANTES de o Supabase limpar os tokens da URL.
 const INITIAL_AUTH_URL = window.location.href;
@@ -2180,7 +2195,10 @@ document.getElementById("clearDemo").addEventListener("click",()=>{
 
 /* ===== AUTENTICAÇÃO / INICIALIZAÇÃO ===== */
 function showAuthView(id){
-  document.getElementById("authShell").hidden=false;document.getElementById("mainApp").hidden=true;
+  document.body.classList.remove("gr-authenticated");
+  const auth=document.getElementById("authShell"),app=document.getElementById("mainApp");
+  auth.hidden=false; auth.style.display="flex";
+  app.hidden=true; app.style.display="none";
   document.querySelectorAll(".auth-view").forEach(v=>v.hidden=v.id!==id);
 }
 function setAuthMessage(id,msg,type="error"){
@@ -2196,82 +2214,128 @@ function updateAuthProfileFromUser(user){
   if(!user)return;state.profile.name=state.profile.name||user.user_metadata?.name||"Usuário";
   state.profile.email=user.email||state.profile.email||"";state.profile.phone=user.user_metadata?.phone||state.profile.phone||"";
 }
-async function openAppForUser(user){
-  activeUser=user;state=await loadUserState(user);updateAuthProfileFromUser(user);
-  document.getElementById("authShell").hidden=true;document.getElementById("mainApp").hidden=false;startApp();saveState();
+function randomTemporaryPassword(){
+  const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
+  return Array.from(bytes,b=>String.fromCharCode(33+(b%90))).join("")+"Aa1!";
 }
-async function requireVerifiedAccount(user){
+async function openAppForUser(user,forceHome=false){
+  activeUser=user;state=await loadUserState(user);updateAuthProfileFromUser(user);
+  document.body.classList.add("gr-authenticated");
+  const auth=document.getElementById("authShell"),app=document.getElementById("mainApp");
+  auth.hidden=true;auth.style.display="none";
+  app.hidden=false;app.style.display="block";
+  if(forceHome){
+    try{window.history.replaceState({},document.title,appBaseUrl()+"#home");}catch(e){location.hash="home";}
+    state.currentScreen="home";state.previousScreen="home";
+  }
+  startApp(forceHome);saveState();
+}
+async function requireVerifiedAccount(user,forceHome=false){
   activeUser=user;
-  if(!user.email_confirmed_at){pendingRegistrationEmail=user.email||pendingRegistrationEmail;document.getElementById("pendingEmailText").textContent=pendingRegistrationEmail;showAuthView("authEmailPending");return;}
-  await openAppForUser(user);
+  if(!user.email_confirmed_at){
+    await supabaseClient.auth.signOut();
+    activeUser=null;
+    showAuthView("authLogin");
+    setAuthMessage("loginError","Confirme seu e-mail antes de entrar.");
+    return;
+  }
+  await openAppForUser(user,forceHome);
 }
 async function refreshAndContinue(){
-  const {data,error}=await supabaseClient.auth.getUser();if(error||!data?.user){showAuthView("authLogin");return;}await requireVerifiedAccount(data.user);
+  const {data,error}=await supabaseClient.auth.getUser();if(error||!data?.user){showAuthView("authLogin");return;}await requireVerifiedAccount(data.user,true);
 }
 async function requestPhoneCode(phoneValue){
-  const phone=normalizePhoneBR(phoneValue);setAuthMessage("phoneVerifyError","");setAuthMessage("phoneVerifySuccess","","success");
-  if(!phone){setAuthMessage("phoneVerifyError","Informe um telefone válido com DDD.");return;}
-  const {data,error}=await supabaseClient.auth.updateUser({phone});
-  if(error){setAuthMessage("phoneVerifyError",error.message||"Não foi possível enviar o SMS.");return;}
-  if(data?.user)activeUser=data.user;pendingRegistrationPhone=phone;localStorage.setItem("gr_pending_phone",phone);
-  document.getElementById("verifyPhoneInput").value=phone;document.getElementById("phoneCodeArea").hidden=false;setAuthMessage("phoneVerifySuccess","Código enviado por SMS.","success");
+  setAuthMessage("phoneVerifyError","A verificação por SMS está desativada neste projeto.");
 }
-function startApp(){
+function startApp(forceHome=false){
   applyTheme();
   if(!appEventSetupDone){appEventSetupDone=true;
     if(window.matchMedia){const mq=window.matchMedia("(prefers-color-scheme: dark)");mq.addEventListener?.("change",()=>{if(state.settings.theme==="system")applyTheme();});}
     window.addEventListener("hashchange",()=>{if(document.getElementById("mainApp").hidden)return;const target=location.hash.replace("#","");if(["home","orders","products","agenda","profile"].includes(target))showScreen(target,false);});
   }
-  const hash=location.hash.replace("#","");const initial=["home","orders","products","agenda","profile"].includes(hash)?hash:"home";
+  const hash=location.hash.replace("#","");
+  const initial=forceHome?"home":(["home","orders","products","agenda","profile"].includes(hash)?hash:"home");
   state.currentScreen=initial;document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(initial).classList.add("active");
   updateBottomNav(initial);renderCurrentScreen();document.getElementById("newOrderDate").value=todayKey();updateNewDeliveryFields();setSyncStatus("☁️ Conectado","ok");
 }
 
-document.getElementById("openRegisterBtn").addEventListener("click",()=>showAuthView("authRegister"));
+document.getElementById("openRegisterBtn").addEventListener("click",()=>{
+  setAuthMessage("registerError","");showAuthView("authRegister");
+});
 document.getElementById("backToLoginBtn").addEventListener("click",()=>showAuthView("authLogin"));
-document.getElementById("emailPendingBackBtn").addEventListener("click",()=>showAuthView("authLogin"));
-document.getElementById("emailConfirmedBtn").addEventListener("click",()=>showAuthView("authLogin"));
+document.getElementById("changeRegisterEmailBtn").addEventListener("click",async()=>{
+  registrationMode=false;registrationVerified=false;pendingRegistrationEmail="";localStorage.removeItem("gr_pending_email");
+  try{await supabaseClient.auth.signOut();}catch(e){}
+  document.getElementById("registerEmailOtp").value="";showAuthView("authRegister");
+});
 
-document.getElementById("registerBtn").addEventListener("click",async()=>{
-  if(!supabaseConfigured()){setAuthMessage("registerError","O Supabase ainda não foi configurado neste HTML.");return;}
-  const name=document.getElementById("registerName").value.trim(),email=document.getElementById("registerEmail").value.trim().toLowerCase();
-  const phone=normalizePhoneBR(document.getElementById("registerPhone").value),password=document.getElementById("registerPassword").value,confirm=document.getElementById("registerPasswordConfirm").value;
-  if(name.length<2){setAuthMessage("registerError","Informe seu nome completo.");return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAuthMessage("registerError","Informe um e-mail válido.");return;}
-  if(!phone){setAuthMessage("registerError","Informe um telefone válido com DDD.");return;}
-  if(password.length<8){setAuthMessage("registerError","A senha precisa ter pelo menos 8 caracteres.");return;}
-  if(password!==confirm){setAuthMessage("registerError","As senhas não conferem.");return;}
-  setAuthMessage("registerError","");
-  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{name,phone},emailRedirectTo:appBaseUrl()}});
-  if(error){setAuthMessage("registerError",error.message||"Não foi possível criar a conta.");return;}
-  pendingRegistrationEmail=email;localStorage.setItem("gr_pending_email",email);
-  document.getElementById("pendingEmailText").textContent=email;showAuthView("authEmailPending");if(data?.session?.user)await requireVerifiedAccount(data.session.user);
+async function sendRegistrationCode(isResend=false){
+  if(!supabaseConfigured()){setAuthMessage("registerError","Configure o Supabase para ativar o cadastro.");return;}
+  const email=(isResend?pendingRegistrationEmail:document.getElementById("registerEmail").value.trim().toLowerCase());
+  const target=isResend?"registerOtpError":"registerError";setAuthMessage(target,"");
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAuthMessage(target,"Informe um e-mail válido.");return;}
+  let error=null,data=null;
+  if(isResend){
+    ({error}=await supabaseClient.auth.resend({type:"signup",email,options:{emailRedirectTo:appBaseUrl()}}));
+  }else{
+    const tempPassword=randomTemporaryPassword();
+    ({data,error}=await supabaseClient.auth.signUp({email,password:tempPassword,options:{data:{gr_registration_status:"pending"},emailRedirectTo:appBaseUrl()}}));
+    if(!error && data?.user && Array.isArray(data.user.identities) && data.user.identities.length===0){
+      setAuthMessage("registerError","Este e-mail já possui uma conta. Use Entrar ou Esqueci minha senha.");return;
+    }
+  }
+  if(error){setAuthMessage(target,error.message||"Não foi possível enviar o código agora.");return;}
+  pendingRegistrationEmail=email;localStorage.setItem("gr_pending_email",email);registrationMode=true;registrationVerified=false;
+  document.getElementById("pendingEmailText").textContent=email;
+  document.getElementById("registerEmailOtp").value="";
+  showAuthView("authRegisterOtp");
+  setAuthMessage("registerOtpSuccess",isResend?"Novo código enviado.":"Código enviado. Confira sua caixa de entrada.","success");
+}
+
+document.getElementById("sendRegisterCodeBtn").addEventListener("click",()=>sendRegistrationCode(false));
+document.getElementById("resendRegisterCodeBtn").addEventListener("click",()=>sendRegistrationCode(true));
+
+document.getElementById("verifyRegisterCodeBtn").addEventListener("click",async()=>{
+  const token=document.getElementById("registerEmailOtp").value.replace(/\D/g,"");
+  setAuthMessage("registerOtpError","");setAuthMessage("registerOtpSuccess","","success");
+  if(!pendingRegistrationEmail){setAuthMessage("registerOtpError","Informe o e-mail novamente.");showAuthView("authRegister");return;}
+  if(token.length<6){setAuthMessage("registerOtpError","Digite o código enviado para seu e-mail.");return;}
+  const {data,error}=await supabaseClient.auth.verifyOtp({email:pendingRegistrationEmail,token,type:"email"});
+  if(error||!data?.user){setAuthMessage("registerOtpError","Código incorreto ou expirado.");return;}
+  activeUser=data.user;registrationMode=true;registrationVerified=true;
+  document.getElementById("verifiedRegisterEmail").textContent=pendingRegistrationEmail;
+  showAuthView("authRegisterDetails");
+});
+
+document.getElementById("finalizeRegisterBtn").addEventListener("click",async()=>{
+  setAuthMessage("registerDetailsError","");
+  if(!registrationVerified||!activeUser){setAuthMessage("registerDetailsError","Confirme o código do e-mail antes de criar a conta.");showAuthView("authRegisterOtp");return;}
+  const name=document.getElementById("registerName").value.trim();
+  const phone=normalizePhoneBR(document.getElementById("registerPhone").value);
+  const password=document.getElementById("registerPassword").value,confirm=document.getElementById("registerPasswordConfirm").value;
+  if(name.length<2){setAuthMessage("registerDetailsError","Informe seu nome completo.");return;}
+  if(!phone){setAuthMessage("registerDetailsError","Informe um telefone válido com DDD.");return;}
+  if(password.length<8){setAuthMessage("registerDetailsError","A senha precisa ter pelo menos 8 caracteres.");return;}
+  if(password!==confirm){setAuthMessage("registerDetailsError","As senhas não conferem.");return;}
+  const {data,error}=await supabaseClient.auth.updateUser({password,data:{name,phone,gr_registration_status:"completed"}});
+  if(error){setAuthMessage("registerDetailsError",error.message||"Não foi possível finalizar a conta.");return;}
+  activeUser=data?.user||activeUser;registrationMode=false;registrationVerified=false;localStorage.removeItem("gr_pending_email");pendingRegistrationEmail="";
+  document.getElementById("loginEmail").value=activeUser.email||"";
+  document.getElementById("loginPassword").value="";
+  await openAppForUser(activeUser,true);
 });
 
 document.getElementById("loginBtn").addEventListener("click",async()=>{
   if(!supabaseConfigured()){setAuthMessage("loginError","Configure o Supabase para ativar o login real.");return;}
   const email=document.getElementById("loginEmail").value.trim().toLowerCase(),password=document.getElementById("loginPassword").value;setAuthMessage("loginError","");
-  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if(error){setAuthMessage("loginError","E-mail ou senha inválidos, ou e-mail ainda não confirmado.");return;}if(data?.user)await requireVerifiedAccount(data.user);
-});
-
-document.getElementById("resendEmailBtn").addEventListener("click",async()=>{
-  const email=pendingRegistrationEmail||document.getElementById("loginEmail").value.trim().toLowerCase();if(!email){setAuthMessage("emailPendingMsg","Informe o e-mail na tela de login.");return;}
-  const {error}=await supabaseClient.auth.resend({type:"signup",email,options:{emailRedirectTo:appBaseUrl()}});
-  setAuthMessage("emailPendingMsg",error?"Não foi possível reenviar agora.":"Novo e-mail de confirmação enviado.",error?"error":"success");
-});
-
-document.getElementById("sendPhoneCodeBtn").addEventListener("click",()=>requestPhoneCode(document.getElementById("verifyPhoneInput").value));
-document.getElementById("resendPhoneCodeBtn").addEventListener("click",async()=>{
-  const phone=normalizePhoneBR(document.getElementById("verifyPhoneInput").value);const {error}=await supabaseClient.auth.resend({type:"phone_change",phone});
-  if(error)setAuthMessage("phoneVerifyError","Não foi possível reenviar o código agora.");else setAuthMessage("phoneVerifySuccess","Código reenviado por SMS.","success");
-});
-document.getElementById("verifyPhoneCodeBtn").addEventListener("click",async()=>{
-  const phone=normalizePhoneBR(document.getElementById("verifyPhoneInput").value),token=document.getElementById("phoneOtp").value.replace(/\D/g,"");
-  if(token.length!==6){setAuthMessage("phoneVerifyError","Digite o código de 6 dígitos.");return;}
-  const {data,error}=await supabaseClient.auth.verifyOtp({phone,token,type:"phone_change"});
-  if(error){setAuthMessage("phoneVerifyError","Código inválido ou expirado.");return;}if(data?.user)activeUser=data.user;localStorage.removeItem("gr_pending_phone");
-  setAuthMessage("phoneVerifySuccess","Telefone confirmado! Entrando...","success");await refreshAndContinue();
+  if(!email||!password){setAuthMessage("loginError","Informe e-mail e senha.");return;}
+  const btn=document.getElementById("loginBtn");btn.disabled=true;btn.textContent="ENTRANDO...";
+  try{
+    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+    if(error||!data?.user){setAuthMessage("loginError","E-mail ou senha inválidos.");return;}
+    registrationMode=false;registrationVerified=false;
+    await requireVerifiedAccount(data.user,true);
+  }finally{btn.disabled=false;btn.textContent="ENTRAR";}
 });
 
 document.getElementById("forgotPasswordBtn").addEventListener("click",async()=>{
