@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<!-- GR GESTÃO - COMPARTILHAR LOJA CORRIGIDO 2026-09-04 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <title>GR Gestão</title>
+<!-- Correção: Compartilhar minha loja envia GRLoja exclusivo -->
 <!-- Correção link GRLoja: /Gr-loja/ -->
 <!-- GR Gestão + Loja Pública v1 -->
 <!-- GR Gestão FINAL OTP v3 - 2026-09-04 -->
@@ -932,7 +934,7 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
 
   <div class="services-list">
     <button class="service-item" id="shareStore">
-      <span>📤</span><div><b>Compartilhar minha loja</b><small>Compartilhe o endereço atual do GR Gestão.</small></div><span>›</span>
+      <span>📤</span><div><b>Compartilhar minha loja</b><small>Compartilhe com seus clientes o link da sua loja online.</small></div><span>›</span>
     </button>
 
     <button class="service-item" id="shareOrders">
@@ -2228,11 +2230,30 @@ function showGeneratedLink(link){
 }
 
 document.getElementById("shareStore").addEventListener("click",async()=>{
-  const link=location.href.split("#")[0];
+  if(!activeUser){
+    showToast("Entre na sua conta primeiro.");
+    return;
+  }
+
+  await syncPublicCatalog();
+
+  const link=CLIENT_STORE_URL+"?loja="+encodeURIComponent(activeUser.id);
+
+  // Mostra sempre o link na tela para o usuário poder conferir/copiar.
+  showGeneratedLink(link);
+
+  // E também abre o compartilhamento nativo do celular quando disponível.
   if(navigator.share){
-    try{ await navigator.share({title:"GR Gestão",text:"GR Gestão",url:link}); }
-    catch(e){ if(e.name!=="AbortError") showGeneratedLink(link); }
-  }else showGeneratedLink(link);
+    try{
+      await navigator.share({
+        title:"Minha loja",
+        text:"Veja meus produtos e faça seu pedido:",
+        url:link
+      });
+    }catch(e){
+      // Se o usuário cancelar o compartilhamento, o link continua visível na tela.
+    }
+  }
 });
 
 document.getElementById("shareOrders").addEventListener("click",async()=>{
