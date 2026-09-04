@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<!-- GR Gestão: medidas, sabores e adicionais v2 -->
+<!-- GR Gestão: Link dos produtos / opção duplicada removida -->
 <!-- GR GESTÃO - COMPARTILHAR LOJA CORRIGIDO 2026-09-04 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -619,13 +621,43 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
   </div>
 
   <div class="form-group"><label>📝 Nome do produto</label><input id="newProductName" placeholder="Digite o nome..."></div>
-  <div class="form-group"><label>💰 Preço</label><input id="newProductPrice" type="number" min="0" step=".01" placeholder="0,00"></div>
+  <div class="form-group"><label>💰 Preço por unidade de medida</label><input id="newProductPrice" type="number" min="0" step=".01" placeholder="0,00"></div>
 
   <div class="form-group">
-    <label>📏 Unidade</label>
+    <label>📏 Unidade de medida</label>
     <select id="newProductUnit">
       <option>Unidade</option><option>Kg</option><option>Pacote</option><option>Caixa</option><option>Litro</option>
     </select>
+    <small style="color:var(--muted)">O preço acima será cobrado por esta unidade de medida.</small>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-title">⚖️ Quantidade permitida ao cliente</div>
+    <div class="form-group"><label>Mínimo</label><input id="newProductMeasureMin" type="number" min="0.01" step="0.01" value="1"></div>
+    <div class="form-group"><label>Máximo</label><input id="newProductMeasureMax" type="number" min="0.01" step="0.01" value="50"></div>
+    <div class="form-group"><label>Intervalo</label><input id="newProductMeasureStep" type="number" min="0.01" step="0.01" value="1"></div>
+    <small style="color:var(--muted)">Ex.: bolo por Kg: mínimo 1, máximo 10, intervalo 0,5. Refrigerante por Litro: mínimo 1, máximo 20.</small>
+  </div>
+
+  <div class="form-group">
+    <label>🎂 Permitir sabores e adicionais?</label>
+    <select id="newProductCustomMode"><option value="false">Não</option><option value="true">Sim</option></select>
+  </div>
+
+  <div id="newProductCustomFields" class="detail-card hidden">
+    <div class="detail-title">🍰 Personalização do produto</div>
+    <div class="form-group"><label>Sabores disponíveis</label><textarea id="newProductFlavors" placeholder="Um por linha. Ex.:
+Chocolate
+Morango
+Ninho
+Prestígio"></textarea></div>
+    <div class="form-group"><label>Sabores incluídos sem acréscimo</label><input id="newProductIncludedFlavors" type="number" min="0" step="1" value="1"></div>
+    <div class="form-group"><label>Valor por sabor extra</label><input id="newProductExtraFlavorPrice" type="number" min="0" step="0.01" value="0"></div>
+    <div class="form-group"><label>Máximo de sabores</label><input id="newProductMaxFlavors" type="number" min="1" step="1" value="4"></div>
+    <div class="form-group"><label>Adicionais e preços</label><textarea id="newProductAddons" placeholder="Um por linha: Nome | Preço
+Ex.: Nutella | 25
+Morango extra | 15
+Topper | 20"></textarea></div>
   </div>
 
   <div class="form-group"><label>📝 Descrição</label><textarea id="newProductDescription" placeholder="Descreva o produto..."></textarea></div>
@@ -656,13 +688,35 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
   </div>
 
   <div class="form-group"><label>📝 Nome</label><input id="editProductName"></div>
-  <div class="form-group"><label>💰 Preço</label><input id="editProductPrice" type="number" min="0" step=".01"></div>
+  <div class="form-group"><label>💰 Preço por unidade de medida</label><input id="editProductPrice" type="number" min="0" step=".01"></div>
 
   <div class="form-group">
-    <label>📏 Unidade</label>
+    <label>📏 Unidade de medida</label>
     <select id="editProductUnit">
       <option>Unidade</option><option>Kg</option><option>Pacote</option><option>Caixa</option><option>Litro</option>
     </select>
+    <small style="color:var(--muted)">O preço acima será cobrado por esta unidade de medida.</small>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-title">⚖️ Quantidade permitida ao cliente</div>
+    <div class="form-group"><label>Mínimo</label><input id="editProductMeasureMin" type="number" min="0.01" step="0.01"></div>
+    <div class="form-group"><label>Máximo</label><input id="editProductMeasureMax" type="number" min="0.01" step="0.01"></div>
+    <div class="form-group"><label>Intervalo</label><input id="editProductMeasureStep" type="number" min="0.01" step="0.01"></div>
+  </div>
+
+  <div class="form-group">
+    <label>🎂 Permitir sabores e adicionais?</label>
+    <select id="editProductCustomMode"><option value="false">Não</option><option value="true">Sim</option></select>
+  </div>
+
+  <div id="editProductCustomFields" class="detail-card hidden">
+    <div class="detail-title">🍰 Personalização do produto</div>
+    <div class="form-group"><label>Sabores disponíveis</label><textarea id="editProductFlavors"></textarea></div>
+    <div class="form-group"><label>Sabores incluídos sem acréscimo</label><input id="editProductIncludedFlavors" type="number" min="0" step="1"></div>
+    <div class="form-group"><label>Valor por sabor extra</label><input id="editProductExtraFlavorPrice" type="number" min="0" step="0.01"></div>
+    <div class="form-group"><label>Máximo de sabores</label><input id="editProductMaxFlavors" type="number" min="1" step="1"></div>
+    <div class="form-group"><label>Adicionais e preços</label><textarea id="editProductAddons" placeholder="Nome | Preço"></textarea></div>
   </div>
 
   <div class="form-group"><label>📝 Descrição</label><textarea id="editProductDescription"></textarea></div>
@@ -934,14 +988,9 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
 
   <div class="services-list">
     <button class="service-item" id="shareStore">
-      <span>📤</span><div><b>Compartilhar minha loja</b><small>Compartilhe com seus clientes o link da sua loja online.</small></div><span>›</span>
+      <span>📤</span><div><b>Link dos produtos</b><small>Envie aos clientes o link para ver seus produtos e fazer pedidos.</small></div><span>›</span>
     </button>
-
-    <button class="service-item" id="shareOrders">
-      <span>🔗</span><div><b>Link da minha loja</b><small>Envie aos clientes para eles verem seus produtos e fazerem pedidos.</small></div><span>›</span>
-    </button>
-
-    <button class="service-item" id="backupData">
+<button class="service-item" id="backupData">
       <span>💾</span><div><b>Backup dos dados</b><small>Baixe uma cópia JSON dos seus dados.</small></div><span>›</span>
     </button>
 
@@ -1120,6 +1169,7 @@ async function syncPublicCatalog(){
       description:p.description||"",
       available:p.available!==false,
       image:p.image||"",
+      options:p.options||{},
       updated_at:new Date().toISOString()
     }));
 
@@ -1270,7 +1320,12 @@ migrateOrderNumbers();
 
 function getOrderItemsText(order){
   return Array.isArray(order.items)
-    ? order.items.map(i=>`${Number(i.quantity||1)}x ${i.name||"Produto"}`).join(" • ")
+    ? order.items.map(i=>{
+        const measure=Number(i.measure||i.weightKg||0);
+        const unit=i.unit||"";
+        const amount=measure?` — ${measure} ${unit}`:"";
+        return `${Number(i.quantity||1)}x ${i.name||"Produto"}${amount}`;
+      }).join(" • ")
     : "";
 }
 
@@ -1449,12 +1504,21 @@ function renderOrderDetails(){
   }
 
   const items=Array.isArray(order.items)?order.items:[];
-  const itemsHTML=items.length?items.map(i=>`
-    <div class="detail-row">
-      <span>${Number(i.quantity||1)}x ${escapeHTML(i.name||"Produto")}</span>
-      <strong>${money(Number(i.price||0)*Number(i.quantity||1))}</strong>
-    </div>
-  `).join(""):'<div class="empty">Nenhum item.</div>';
+  const itemsHTML=items.length?items.map(i=>{
+    const measure=Number(i.measure||i.weightKg||0);
+    const unit=i.unit||"";
+    const flavors=Array.isArray(i.flavors)?i.flavors:[];
+    const addons=Array.isArray(i.addons)?i.addons:[];
+    const details=[];
+    if(measure)details.push(`${measure} ${unit}`);
+    if(flavors.length)details.push(`Sabores: ${flavors.join(", ")}`);
+    if(addons.length)details.push(`Adicionais: ${addons.map(a=>a.name||a).join(", ")}`);
+    return `
+    <div class="detail-row" style="align-items:flex-start">
+      <span>${Number(i.quantity||1)}x ${escapeHTML(i.name||"Produto")}${details.length?`<small style="display:block;color:var(--muted);margin-top:4px;line-height:1.4">${escapeHTML(details.join(" • "))}</small>`:""}</span>
+      <strong>${money(Number(i.lineTotal??(Number(i.price||0)*Number(i.quantity||1))))}</strong>
+    </div>`;
+  }).join(""):'<div class="empty">Nenhum item.</div>';
 
   const deliveryHTML=order.delivery==="pickup"?`
     <div class="detail-row"><span>Forma</span><strong>Retirada</strong></div>
@@ -1705,6 +1769,7 @@ function renderProducts(){
       <div class="product-content">
         <div class="product-name">${escapeHTML(p.name||"Produto")}</div>
         <div class="price">${money(p.price)} / ${escapeHTML(p.unit||"Unidade")}</div>
+        ${p.options?.customizable?'<div style="font-size:12px;color:var(--muted);margin-top:4px">🎂 Sabores e adicionais disponíveis</div>':""}
         <div class="availability ${p.available!==false?"completed":"cancelled"}">${p.available!==false?"Disponível":"Indisponível"}</div>
       </div>
       <span>›</span>
@@ -1712,8 +1777,60 @@ function renderProducts(){
   `).join("");
 }
 
+function parseLines(value){
+  return String(value||"").split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+}
+function parseAddons(value){
+  return parseLines(value).map(line=>{
+    const parts=line.split("|");
+    const name=(parts[0]||"").trim();
+    const price=Math.max(0,Number(String(parts[1]||"0").replace(",","."))||0);
+    return name?{name,price}:null;
+  }).filter(Boolean);
+}
+function unitDefaults(unit){
+  const continuous=unit==="Kg"||unit==="Litro";
+  return continuous?{min:0.5,max:20,step:0.5}:{min:1,max:50,step:1};
+}
+function toggleCustomFields(prefix){
+  const mode=document.getElementById(prefix+"ProductCustomMode");
+  document.getElementById(prefix+"ProductCustomFields")?.classList.toggle("hidden",mode?.value!=="true");
+}
+function readProductOptions(prefix){
+  const unit=document.getElementById(prefix+"ProductUnit")?.value||"Unidade";
+  const defs=unitDefaults(unit);
+  let min=Math.max(0.01,Number(document.getElementById(prefix+"ProductMeasureMin")?.value||defs.min));
+  let max=Math.max(min,Number(document.getElementById(prefix+"ProductMeasureMax")?.value||defs.max));
+  let step=Math.max(0.01,Number(document.getElementById(prefix+"ProductMeasureStep")?.value||defs.step));
+  const custom=document.getElementById(prefix+"ProductCustomMode")?.value==="true";
+  return {
+    measureMin:min,measureMax:max,measureStep:step,
+    customizable:custom,
+    flavors:custom?parseLines(document.getElementById(prefix+"ProductFlavors")?.value):[],
+    includedFlavors:custom?Math.max(0,Math.floor(Number(document.getElementById(prefix+"ProductIncludedFlavors")?.value||1))):0,
+    extraFlavorPrice:custom?Math.max(0,Number(document.getElementById(prefix+"ProductExtraFlavorPrice")?.value||0)):0,
+    maxFlavors:custom?Math.max(1,Math.floor(Number(document.getElementById(prefix+"ProductMaxFlavors")?.value||4))):0,
+    addons:custom?parseAddons(document.getElementById(prefix+"ProductAddons")?.value):[]
+  };
+}
+function fillProductOptions(prefix,options,unit){
+  const defs=unitDefaults(unit||"Unidade"),o=options||{};
+  const set=(suffix,value)=>{const el=document.getElementById(prefix+"Product"+suffix);if(el)el.value=value};
+  set("MeasureMin",o.measureMin??defs.min);set("MeasureMax",o.measureMax??defs.max);set("MeasureStep",o.measureStep??defs.step);
+  set("CustomMode",o.customizable===true?"true":"false");
+  set("Flavors",Array.isArray(o.flavors)?o.flavors.join("\n"):"");
+  set("IncludedFlavors",o.includedFlavors??1);set("ExtraFlavorPrice",o.extraFlavorPrice??0);set("MaxFlavors",o.maxFlavors??4);
+  set("Addons",Array.isArray(o.addons)?o.addons.map(a=>`${a.name||""} | ${Number(a.price||0).toFixed(2)}`).join("\n"):"");
+  toggleCustomFields(prefix);
+}
+function applyUnitDefaults(prefix){
+  const unit=document.getElementById(prefix+"ProductUnit")?.value||"Unidade";
+  const d=unitDefaults(unit);const set=(s,v)=>{const el=document.getElementById(prefix+"Product"+s);if(el)el.value=v};
+  set("MeasureMin",d.min);set("MeasureMax",d.max);set("MeasureStep",d.step);
+}
 function renderAddProduct(){
   document.getElementById("newProductPreview").innerHTML=newProductImageData?`<img src="${escapeHTML(newProductImageData)}" alt="">`:"🖼️";
+  toggleCustomFields("new");
 }
 
 function renderEditProduct(){
@@ -1726,6 +1843,7 @@ function renderEditProduct(){
   document.getElementById("editProductUnit").value=p.unit||"Unidade";
   document.getElementById("editProductDescription").value=p.description||"";
   document.getElementById("editProductAvailable").value=p.available!==false?"true":"false";
+  fillProductOptions("edit",p.options||{},p.unit||"Unidade");
 }
 
 function fileToDataURL(file,callback){
@@ -2057,6 +2175,10 @@ document.getElementById("saveOrder").addEventListener("click",()=>{
 });
 
 /* PRODUTO EVENTOS */
+document.getElementById("newProductCustomMode").addEventListener("change",()=>toggleCustomFields("new"));
+document.getElementById("editProductCustomMode").addEventListener("change",()=>toggleCustomFields("edit"));
+document.getElementById("newProductUnit").addEventListener("change",()=>applyUnitDefaults("new"));
+document.getElementById("editProductUnit").addEventListener("change",()=>applyUnitDefaults("edit"));
 document.getElementById("addImageDemo").addEventListener("click",()=>document.getElementById("newProductImage").click());
 document.getElementById("newProductImage").addEventListener("change",e=>{
   fileToDataURL(e.target.files[0],data=>{
@@ -2078,7 +2200,8 @@ document.getElementById("createProduct").addEventListener("click",()=>{
     unit:document.getElementById("newProductUnit").value,
     description:document.getElementById("newProductDescription").value.trim(),
     available:document.getElementById("newProductAvailable").value==="true",
-    image:newProductImageData
+    image:newProductImageData,
+    options:readProductOptions("new")
   });
   saveState();
 
@@ -2087,6 +2210,7 @@ document.getElementById("createProduct").addEventListener("click",()=>{
   document.getElementById("newProductDescription").value="";
   document.getElementById("newProductUnit").value="Unidade";
   document.getElementById("newProductAvailable").value="true";
+  fillProductOptions("new",{},"Unidade");
   document.getElementById("newProductImage").value="";
   newProductImageData="";
   document.getElementById("newProductPreview").textContent="🖼️";
@@ -2115,6 +2239,7 @@ document.getElementById("saveProduct").addEventListener("click",()=>{
   p.description=document.getElementById("editProductDescription").value.trim();
   p.available=document.getElementById("editProductAvailable").value==="true";
   p.image=editProductImageData||"";
+  p.options=readProductOptions("edit");
   saveState();
   editProductImageData="";
   showScreen("products");
@@ -2254,13 +2379,6 @@ document.getElementById("shareStore").addEventListener("click",async()=>{
       // Se o usuário cancelar o compartilhamento, o link continua visível na tela.
     }
   }
-});
-
-document.getElementById("shareOrders").addEventListener("click",async()=>{
-  if(!activeUser){showToast("Entre na sua conta primeiro.");return;}
-  await syncPublicCatalog();
-  const link=CLIENT_STORE_URL+"?loja="+encodeURIComponent(activeUser.id);
-  showGeneratedLink(link);
 });
 
 document.getElementById("copyGeneratedLink").addEventListener("click",async()=>{
