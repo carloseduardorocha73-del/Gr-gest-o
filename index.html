@@ -326,7 +326,7 @@ img{display:block}
     </div>
 
     <div id="authRegister" class="auth-view" hidden>
-      <div class="auth-head"><h1>Criar conta</h1><p>Cadastre seus dados. A conta só será liberada após a confirmação do e-mail e do telefone.</p></div>
+      <div class="auth-head"><h1>Criar conta</h1><p>Cadastre seus dados. A conta será liberada após a confirmação do e-mail.</p></div>
       <div class="form-group"><label>👤 Nome completo</label><input id="registerName" type="text" autocomplete="name" placeholder="Seu nome completo"></div>
       <div class="form-group"><label>📧 E-mail</label><input id="registerEmail" type="email" autocomplete="email" placeholder="seuemail@email.com"></div>
       <div class="form-group"><label>📱 Telefone</label><input id="registerPhone" type="tel" autocomplete="tel" placeholder="(64) 99999-9999"></div>
@@ -714,7 +714,7 @@ img{display:block}
     <div class="avatar" id="profileAvatar">C</div>
     <h2 id="profileDisplayName">Usuário</h2>
     <div id="profileRoleBadge" class="role-badge">USUÁRIO</div>
-    <div class="verification-badges"><span id="profileEmailVerified" class="verify-badge pending">📧 E-mail</span><span id="profilePhoneVerified" class="verify-badge pending">📱 Telefone</span></div>
+    <div class="verification-badges"><span id="profileEmailVerified" class="verify-badge pending">📧 E-mail</span><span id="profilePhoneVerified" class="verify-badge pending">📱 Telefone cadastrado</span></div>
     <div id="syncStatus" class="sync-indicator">☁️ Banco online</div>
   </div>
 
@@ -749,7 +749,7 @@ img{display:block}
   <div class="form-card">
     <label>Nome</label><input id="profileName" type="text">
     <label>CPF</label><input id="profileCpf" type="text" placeholder="000.000.000-00">
-    <label>Telefone</label><input id="profilePhone" type="tel" placeholder="(00) 00000-0000" readonly><div class="notice">O telefone é vinculado à autenticação e precisa ser verificado por SMS.</div>
+    <label>Telefone</label><input id="profilePhone" type="tel" placeholder="(00) 00000-0000"><div class="notice">O telefone fica salvo no seu perfil. Nesta versão, não há confirmação por SMS.</div>
     <label>E-mail</label><input id="profileEmail" type="email" placeholder="seuemail@email.com" readonly><div class="notice">O e-mail é vinculado à autenticação e precisa ser confirmado.</div>
     <label>Endereço</label><textarea id="profileAddress" rows="3" placeholder="Rua, número, bairro, cidade..."></textarea>
     <button class="primary" id="saveProfile">💾 Salvar dados</button>
@@ -817,8 +817,8 @@ img{display:block}
   <div class="form-card" style="margin-top:12px">
     <h3>📱 Alterar telefone</h3>
     <label>Novo telefone</label><input id="securityPhone" type="tel" placeholder="(64) 99999-9999">
-    <button class="primary" id="changePhone">Verificar novo telefone</button>
-    <div class="notice">Um código de confirmação será enviado por SMS.</div>
+    <button class="primary" id="changePhone">Salvar telefone</button>
+    <div class="notice">O telefone será atualizado no seu perfil sem verificação por SMS.</div>
   </div>
 
   <div class="form-card" style="margin-top:12px">
@@ -974,7 +974,7 @@ img{display:block}
    Nunca coloque a service_role key neste HTML. Use somente a chave publishable/anon. */
 const SUPABASE_URL = "https://kygfrtgdcnhldnovmfxp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_5ilrr3ijRTzXl46M6dw31g_4zYq3fgn";
-const ADMIN_EMAIL = "".toLowerCase(); // Definiremos o único ADM na próxima etapa
+const ADMIN_EMAIL = "carloseduardorocha73@gmail.com".toLowerCase(); // Único administrador do GR Gestão
 const LEGACY_STORAGE_KEY = "gr_gestao_state_v2";
 const STORAGE_PREFIX = "gr_gestao_user_state_v3_";
 
@@ -1007,7 +1007,7 @@ let supabaseClient = null;
 let syncTimer = null;
 let appEventSetupDone = false;
 let pendingRegistrationEmail = localStorage.getItem("gr_pending_email") || "";
-let pendingRegistrationPhone = localStorage.getItem("gr_pending_phone") || "";
+let pendingRegistrationPhone = ""; // SMS desativado
 
 function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
 function mergeState(parsed){
@@ -1674,13 +1674,13 @@ function renderProfile(){
   if(role){role.textContent=isAdmin()?"ADMINISTRADOR":"USUÁRIO";role.style.color=isAdmin()?"var(--blue)":"var(--text)";}
   const eb=document.getElementById("profileEmailVerified"),pb=document.getElementById("profilePhoneVerified");
   if(eb){const ok=!!activeUser?.email_confirmed_at;eb.className="verify-badge "+(ok?"ok":"pending");eb.textContent=(ok?"✅":"⏳")+" E-mail";}
-  if(pb){const ok=!!activeUser?.phone_confirmed_at;pb.className="verify-badge "+(ok?"ok":"pending");pb.textContent=(ok?"✅":"⏳")+" Telefone";}
+  if(pb){const phone=state.profile.phone||activeUser?.user_metadata?.phone||"";pb.className="verify-badge "+(phone?"ok":"pending");pb.textContent=(phone?"📱":"⏳")+(phone?" Telefone cadastrado":" Telefone não cadastrado");}
 }
 
 function renderMyData(){
   document.getElementById("profileName").value=state.profile.name||activeUser?.user_metadata?.name||"";
   document.getElementById("profileCpf").value=state.profile.cpf||"";
-  document.getElementById("profilePhone").value=activeUser?.phone||state.profile.phone||activeUser?.user_metadata?.phone||"";
+  document.getElementById("profilePhone").value=state.profile.phone||activeUser?.user_metadata?.phone||"";
   document.getElementById("profileEmail").value=activeUser?.email||state.profile.email||"";
   document.getElementById("profileAddress").value=state.profile.address||"";
 }
@@ -2007,11 +2007,11 @@ document.getElementById("nextMonth").addEventListener("click",()=>{
 document.getElementById("saveProfile").addEventListener("click",async()=>{
   state.profile.name=document.getElementById("profileName").value.trim()||"Usuário";
   state.profile.cpf=document.getElementById("profileCpf").value.trim();
-  state.profile.phone=activeUser?.phone||state.profile.phone||"";
+  state.profile.phone=normalizePhoneBR(document.getElementById("profilePhone").value)||document.getElementById("profilePhone").value.trim();
   state.profile.email=activeUser?.email||state.profile.email||"";
   state.profile.address=document.getElementById("profileAddress").value.trim();
   if(supabaseClient&&activeUser){
-    const {data,error}=await supabaseClient.auth.updateUser({data:{...activeUser.user_metadata,name:state.profile.name}});
+    const {data,error}=await supabaseClient.auth.updateUser({data:{...activeUser.user_metadata,name:state.profile.name,phone:state.profile.phone}});
     if(!error&&data?.user)activeUser=data.user;
   }
   saveState();showToast("Dados salvos!");
@@ -2055,9 +2055,14 @@ document.getElementById("changeEmail").addEventListener("click",async()=>{
 });
 
 document.getElementById("changePhone").addEventListener("click",async()=>{
-  const phone=normalizePhoneBR(document.getElementById("securityPhone").value);
+  const raw=document.getElementById("securityPhone").value.trim();
+  const phone=normalizePhoneBR(raw);
   if(!phone){showToast("Informe um telefone válido com DDD.");return;}
-  document.getElementById("verifyPhoneInput").value=phone;showAuthView("authPhoneVerify");await requestPhoneCode(phone);
+  const {data,error}=await supabaseClient.auth.updateUser({data:{...activeUser.user_metadata,phone}});
+  if(error){showToast("Não foi possível atualizar o telefone.");return;}
+  if(data?.user)activeUser=data.user;
+  state.profile.phone=phone;saveState();
+  document.getElementById("securityPhone").value="";showToast("Telefone atualizado!");
 });
 
 document.getElementById("changeCpf").addEventListener("click",()=>{
@@ -2167,7 +2172,7 @@ function normalizePhoneBR(value){
 }
 function updateAuthProfileFromUser(user){
   if(!user)return;state.profile.name=state.profile.name||user.user_metadata?.name||"Usuário";
-  state.profile.email=user.email||state.profile.email||"";state.profile.phone=user.phone||user.user_metadata?.phone||state.profile.phone||"";
+  state.profile.email=user.email||state.profile.email||"";state.profile.phone=user.user_metadata?.phone||state.profile.phone||"";
 }
 async function openAppForUser(user){
   activeUser=user;state=await loadUserState(user);updateAuthProfileFromUser(user);
@@ -2176,7 +2181,6 @@ async function openAppForUser(user){
 async function requireVerifiedAccount(user){
   activeUser=user;
   if(!user.email_confirmed_at){pendingRegistrationEmail=user.email||pendingRegistrationEmail;document.getElementById("pendingEmailText").textContent=pendingRegistrationEmail;showAuthView("authEmailPending");return;}
-  if(!user.phone_confirmed_at){document.getElementById("verifyPhoneInput").value=user.user_metadata?.phone||pendingRegistrationPhone||"";showAuthView("authPhoneVerify");return;}
   await openAppForUser(user);
 }
 async function refreshAndContinue(){
@@ -2218,7 +2222,7 @@ document.getElementById("registerBtn").addEventListener("click",async()=>{
   setAuthMessage("registerError","");
   const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{name,phone},emailRedirectTo:location.href.split("#")[0]}});
   if(error){setAuthMessage("registerError",error.message||"Não foi possível criar a conta.");return;}
-  pendingRegistrationEmail=email;pendingRegistrationPhone=phone;localStorage.setItem("gr_pending_email",email);localStorage.setItem("gr_pending_phone",phone);
+  pendingRegistrationEmail=email;localStorage.setItem("gr_pending_email",email);
   document.getElementById("pendingEmailText").textContent=email;showAuthView("authEmailPending");if(data?.session?.user)await requireVerifiedAccount(data.session.user);
 });
 
