@@ -1009,6 +1009,28 @@ let appEventSetupDone = false;
 let pendingRegistrationEmail = localStorage.getItem("gr_pending_email") || "";
 let pendingRegistrationPhone = ""; // SMS desativado
 
+// Recuperação de senha: captura o estado ANTES de o Supabase limpar os tokens da URL.
+const INITIAL_AUTH_URL = window.location.href;
+const INITIAL_HASH_PARAMS = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+const INITIAL_QUERY_PARAMS = new URLSearchParams(window.location.search || "");
+const INITIAL_RECOVERY_INTENT =
+  INITIAL_HASH_PARAMS.get("type") === "recovery" ||
+  INITIAL_QUERY_PARAMS.get("type") === "recovery" ||
+  INITIAL_QUERY_PARAMS.get("gr_recovery") === "1";
+
+function appBaseUrl(){
+  return window.location.origin + window.location.pathname;
+}
+function recoveryRedirectUrl(){
+  return appBaseUrl();
+}
+function cleanRecoveryUrl(){
+  try{
+    const clean = appBaseUrl();
+    if(window.history?.replaceState) window.history.replaceState({}, document.title, clean);
+  }catch(e){}
+}
+
 function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
 function mergeState(parsed){
   parsed = parsed && typeof parsed === "object" ? parsed : {};
@@ -2220,7 +2242,7 @@ document.getElementById("registerBtn").addEventListener("click",async()=>{
   if(password.length<8){setAuthMessage("registerError","A senha precisa ter pelo menos 8 caracteres.");return;}
   if(password!==confirm){setAuthMessage("registerError","As senhas não conferem.");return;}
   setAuthMessage("registerError","");
-  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{name,phone},emailRedirectTo:location.href.split("#")[0]}});
+  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:{name,phone},emailRedirectTo:appBaseUrl()}});
   if(error){setAuthMessage("registerError",error.message||"Não foi possível criar a conta.");return;}
   pendingRegistrationEmail=email;localStorage.setItem("gr_pending_email",email);
   document.getElementById("pendingEmailText").textContent=email;showAuthView("authEmailPending");if(data?.session?.user)await requireVerifiedAccount(data.session.user);
@@ -2235,7 +2257,7 @@ document.getElementById("loginBtn").addEventListener("click",async()=>{
 
 document.getElementById("resendEmailBtn").addEventListener("click",async()=>{
   const email=pendingRegistrationEmail||document.getElementById("loginEmail").value.trim().toLowerCase();if(!email){setAuthMessage("emailPendingMsg","Informe o e-mail na tela de login.");return;}
-  const {error}=await supabaseClient.auth.resend({type:"signup",email,options:{emailRedirectTo:location.href.split("#")[0]}});
+  const {error}=await supabaseClient.auth.resend({type:"signup",email,options:{emailRedirectTo:appBaseUrl()}});
   setAuthMessage("emailPendingMsg",error?"Não foi possível reenviar agora.":"Novo e-mail de confirmação enviado.",error?"error":"success");
 });
 
@@ -2254,13 +2276,16 @@ document.getElementById("verifyPhoneCodeBtn").addEventListener("click",async()=>
 
 document.getElementById("forgotPasswordBtn").addEventListener("click",async()=>{
   const email=document.getElementById("loginEmail").value.trim().toLowerCase();if(!email){setAuthMessage("loginError","Digite seu e-mail acima para receber o link de recuperação.");return;}
-  const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:location.href.split("#")[0]});
+  const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirectUrl()});
+  if(!error){try{localStorage.setItem("gr_recovery_requested_at",String(Date.now()));}catch(e){}}
   setAuthMessage("loginError",error?"Não foi possível enviar o link agora.":"Link de recuperação enviado para seu e-mail.",error?"error":"success");
 });
 document.getElementById("saveRecoveryPasswordBtn").addEventListener("click",async()=>{
   const p=document.getElementById("recoveryPassword").value,c=document.getElementById("recoveryPasswordConfirm").value;
   if(p.length<8){setAuthMessage("recoveryError","A senha precisa ter pelo menos 8 caracteres.");return;}if(p!==c){setAuthMessage("recoveryError","As senhas não conferem.");return;}
   const {error}=await supabaseClient.auth.updateUser({password:p});if(error){setAuthMessage("recoveryError","Não foi possível alterar a senha.");return;}
+  try{localStorage.removeItem("gr_recovery_requested_at");}catch(e){}
+  cleanRecoveryUrl();
   await supabaseClient.auth.signOut();showAuthView("authLogin");setAuthMessage("loginError","Senha alterada. Entre com a nova senha.","success");
 });
 
@@ -2275,13 +2300,63 @@ async function init(){
     notice.innerHTML="⚙️ <b>Falta conectar o banco online.</b><br>Preencha no código SUPABASE_URL e SUPABASE_ANON_KEY. A interface já está pronta; o login real só é liberado após essa configuração.";
     showAuthView("authLogin");return;
   }
-  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+
+  // Se a pessoa acabou de pedir recuperação neste navegador, usamos isso como
+  // confirmação extra caso o navegador/Supabase remova o hash antes da interface abrir.
+  let recentRecoveryRequest=false;
+  try{
+    const ts=Number(localStorage.getItem("gr_recovery_requested_at")||0);
+    recentRecoveryRequest=ts>0 && (Date.now()-ts)<(60*60*1000);
+  }catch(e){}
+  let recoveryMode=INITIAL_RECOVERY_INTENT || recentRecoveryRequest;
+
+  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+
   supabaseClient.auth.onAuthStateChange((event,session)=>{setTimeout(async()=>{
-    if(event==="PASSWORD_RECOVERY"){activeUser=session?.user||null;showAuthView("authRecovery");return;}
-    if(event==="SIGNED_OUT"){activeUser=null;document.getElementById("mainApp").hidden=true;showAuthView("authLogin");return;}
-    if(session?.user&&["SIGNED_IN","TOKEN_REFRESHED","USER_UPDATED","INITIAL_SESSION"].includes(event))activeUser=session.user;
+    if(event==="PASSWORD_RECOVERY"){
+      recoveryMode=true;
+      activeUser=session?.user||null;
+      showAuthView("authRecovery");
+      cleanRecoveryUrl();
+      return;
+    }
+    if(event==="SIGNED_OUT"){
+      activeUser=null;document.getElementById("mainApp").hidden=true;showAuthView("authLogin");return;
+    }
+    if(session?.user&&["SIGNED_IN","TOKEN_REFRESHED","USER_UPDATED","INITIAL_SESSION"].includes(event)){
+      activeUser=session.user;
+      if(recoveryMode){showAuthView("authRecovery");cleanRecoveryUrl();return;}
+    }
   },0);});
-  const {data:{session}}=await supabaseClient.auth.getSession();if(session?.user)await requireVerifiedAccount(session.user);else showAuthView("authLogin");
+
+  const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+  if(sessionError) console.warn("Falha ao recuperar sessão:",sessionError);
+
+  if(recoveryMode){
+    if(session?.user){
+      activeUser=session.user;
+      showAuthView("authRecovery");
+      cleanRecoveryUrl();
+      return;
+    }
+    // Dá uma pequena chance para o cliente processar o token/código do link.
+    await new Promise(r=>setTimeout(r,500));
+    const {data:{session:retrySession}}=await supabaseClient.auth.getSession();
+    if(retrySession?.user){
+      activeUser=retrySession.user;
+      showAuthView("authRecovery");
+      cleanRecoveryUrl();
+      return;
+    }
+    showAuthView("authLogin");
+    setAuthMessage("loginError","O link de recuperação expirou ou não pôde ser validado. Solicite um novo link.");
+    return;
+  }
+
+  if(session?.user) await requireVerifiedAccount(session.user);
+  else showAuthView("authLogin");
 }
 
 init();
