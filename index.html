@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <title>GR Gestão</title>
+<!-- GR Gestão + Loja Pública v1 -->
 <!-- GR Gestão FINAL OTP v3 - 2026-09-04 -->
 
 <style>
@@ -934,7 +935,7 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
     </button>
 
     <button class="service-item" id="shareOrders">
-      <span>🔗</span><div><b>Link dos meus pedidos</b><small>Gere um link local apontando para a tela de pedidos.</small></div><span>›</span>
+      <span>🔗</span><div><b>Link da minha loja</b><small>Envie aos clientes para eles verem seus produtos e fazerem pedidos.</small></div><span>›</span>
     </button>
 
     <button class="service-item" id="backupData">
@@ -956,7 +957,7 @@ body:not(.gr-authenticated) #mainApp{display:none !important}
     <b>🔗 Link gerado</b>
     <input id="generatedLink" type="text" readonly>
     <button class="primary" id="copyGeneratedLink">Copiar link</button>
-    <div class="notice">Sem hospedagem/servidor, esse link só funciona no endereço em que o arquivo HTML estiver aberto.</div>
+    <div class="notice">Este link abre sua loja pública e mostra somente os produtos cadastrados na sua conta.</div>
   </div>
 </section>
 
@@ -1086,8 +1087,108 @@ function saveState(){
   syncTimer=setTimeout(async()=>{
     if(!supabaseClient||!activeUser)return;setSyncStatus("☁️ Salvando...");
     const {error}=await supabaseClient.from("user_states").upsert({user_id:activeUser.id,data:state,updated_at:new Date().toISOString()},{onConflict:"user_id"});
-    if(error){console.warn(error);setSyncStatus("⚠️ Não sincronizado","error");}else setSyncStatus("☁️ Sincronizado","ok");
+    if(error){console.warn(error);setSyncStatus("⚠️ Não sincronizado","error");}
+    else{
+      setSyncStatus("☁️ Sincronizado","ok");
+      syncPublicCatalog();
+    }
   },450);
+}
+
+
+const CLIENT_STORE_URL="https://carloseduardorocha73-del.github.io/GRLoja/";
+
+async function syncPublicCatalog(){
+  if(!supabaseClient||!activeUser)return;
+  try{
+    await supabaseClient.from("storefronts").upsert({
+      owner_id:activeUser.id,
+      store_name:state.profile.name?`Loja de ${state.profile.name}`:"Minha Loja",
+      active:true,
+      updated_at:new Date().toISOString()
+    },{onConflict:"owner_id"});
+
+    const rows=(state.products||[]).map(p=>({
+      owner_id:activeUser.id,
+      source_product_id:String(p.id),
+      name:p.name||"Produto",
+      price:Number(p.price||0),
+      unit:p.unit||"Unidade",
+      description:p.description||"",
+      available:p.available!==false,
+      image:p.image||"",
+      updated_at:new Date().toISOString()
+    }));
+
+    if(rows.length){
+      const {error}=await supabaseClient.from("public_products")
+        .upsert(rows,{onConflict:"owner_id,source_product_id"});
+      if(error)throw error;
+    }
+
+    const {data:existing,error:readError}=await supabaseClient.from("public_products")
+      .select("source_product_id").eq("owner_id",activeUser.id);
+    if(readError)throw readError;
+    const current=new Set(rows.map(r=>r.source_product_id));
+    const removed=(existing||[]).map(x=>x.source_product_id).filter(id=>!current.has(id));
+    if(removed.length){
+      const {error:delError}=await supabaseClient.from("public_products")
+        .delete().eq("owner_id",activeUser.id).in("source_product_id",removed);
+      if(delError)throw delError;
+    }
+  }catch(e){
+    console.warn("Catálogo público ainda não configurado:",e);
+  }
+}
+
+function mapIncomingOrder(row){
+  const fullAddress=[row.street,row.number,row.neighborhood,row.complement,row.city,row.reference]
+    .filter(Boolean).join(", ");
+  return {
+    id:"web_"+row.id,
+    externalOrderId:row.id,
+    number:getNextOrderNumber(),
+    customer:row.customer_name||"Cliente",
+    phone:row.whatsapp||"",
+    date:row.requested_date||todayKey(),
+    time:"",
+    payment:row.payment_method||"Não informado",
+    delivery:row.delivery_method==="pickup"?"pickup":"delivery",
+    address:fullAddress,
+    receiver:row.customer_name||"",
+    receiverPhone:row.whatsapp||"",
+    picker:row.customer_name||"",
+    pickerPhone:row.whatsapp||"",
+    items:Array.isArray(row.items)?row.items:[],
+    subtotal:Number(row.subtotal||0),
+    discount:0,
+    total:Number(row.total||0),
+    status:row.status==="completed"?"completed":row.status==="cancelled"?"cancelled":"pending",
+    notes:[row.notes||"", "Pedido recebido pelo site da loja."].filter(Boolean).join("\n")
+  };
+}
+
+async function syncIncomingOrders(){
+  if(!supabaseClient||!activeUser)return;
+  try{
+    const {data,error}=await supabaseClient.from("customer_orders")
+      .select("*").eq("owner_id",activeUser.id).order("created_at",{ascending:false});
+    if(error)throw error;
+    let changed=false;
+    for(const row of (data||[])){
+      if(!(state.orders||[]).some(o=>o.externalOrderId===row.id)){
+        state.orders.push(mapIncomingOrder(row));
+        changed=true;
+      }
+    }
+    if(changed){
+      saveState();
+      if(["home","orders"].includes(state.currentScreen))renderCurrentScreen();
+      showToast("Novo pedido recebido da sua loja!");
+    }
+  }catch(e){
+    console.warn("Pedidos da loja ainda não disponíveis:",e);
+  }
 }
 
 function uid(prefix="id"){
@@ -2133,9 +2234,11 @@ document.getElementById("shareStore").addEventListener("click",async()=>{
   }else showGeneratedLink(link);
 });
 
-document.getElementById("shareOrders").addEventListener("click",()=>{
-  const base=location.href.split("#")[0];
-  showGeneratedLink(base+"#orders");
+document.getElementById("shareOrders").addEventListener("click",async()=>{
+  if(!activeUser){showToast("Entre na sua conta primeiro.");return;}
+  await syncPublicCatalog();
+  const link=CLIENT_STORE_URL+"?loja="+encodeURIComponent(activeUser.id);
+  showGeneratedLink(link);
 });
 
 document.getElementById("copyGeneratedLink").addEventListener("click",async()=>{
@@ -2220,6 +2323,8 @@ function randomTemporaryPassword(){
 }
 async function openAppForUser(user,forceHome=false){
   activeUser=user;state=await loadUserState(user);updateAuthProfileFromUser(user);
+  await syncPublicCatalog();
+  await syncIncomingOrders();
   document.body.classList.add("gr-authenticated");
   const auth=document.getElementById("authShell"),app=document.getElementById("mainApp");
   auth.hidden=true;auth.style.display="none";
